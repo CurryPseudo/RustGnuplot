@@ -131,6 +131,7 @@ pub struct Figure
 	gnuplot: Option<Child>,
 	version: Option<GnuplotVersion>,
 	multiplot_options: Option<MultiplotOptions>,
+	gnuplot_command_map: Option<Box<dyn Fn(&mut Command)>>
 }
 
 impl Default for GnuplotVersion
@@ -164,6 +165,7 @@ impl Figure
 			pre_commands: "".into(),
 			version: None,
 			multiplot_options: None,
+			gnuplot_command_map: None
 		}
 	}
 
@@ -377,15 +379,21 @@ impl Figure
 
 		if self.gnuplot.is_none()
 		{
-			self.gnuplot = Some(
-				Command::new("gnuplot")
-					.arg("-p")
-					.stdin(Stdio::piped())
-					.spawn()
+			self.gnuplot = {
+				let mut command = Command::new("gnuplot");
+				        
+				command.arg("-p")
+					.stdin(Stdio::piped());
+
+				if let Some(gnuplot_command_map) = &self.gnuplot_command_map {
+				    gnuplot_command_map(&mut command);
+				}
+					
+				Some(command.spawn()
 					.expect(
 						"Couldn't spawn gnuplot. Make sure it is installed and available in PATH.",
-					),
-			);
+					))
+			};
 		}
 
 		{
@@ -676,6 +684,11 @@ impl Figure
 		self.echo(&mut file);
 		file.flush();
 		self
+	}
+
+	pub fn set_gnuplot_command_map(&mut self, command_map: Option<Box<dyn Fn(&mut Command)>>) {
+		self.gnuplot = None;
+		self.gnuplot_command_map = command_map;
 	}
 }
 
